@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/NUKMUK/lookmovie-for-stremio#readme",
   "dependencies": {
+    "got": "^11.8.1",
     "stremio-addon-sdk": "^1.6.4"
   }
 }
