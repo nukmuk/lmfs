@@ -1,0 +1,22 @@
+{
+  "name": "lookmovie-for-stremio",
+  "version": "1.0.0",
+  "description": "",
+  "main": "addon.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NUKMUK/lookmovie-for-stremio.git"
+  },
+  "author": "nakki",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/NUKMUK/lookmovie-for-stremio/issues"
+  },
+  "homepage": "https://github.com/NUKMUK/lookmovie-for-stremio#readme",
+  "dependencies": {
+    "stremio-addon-sdk": "^1.6.4"
+  }
+}
