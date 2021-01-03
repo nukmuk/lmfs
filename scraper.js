@@ -2,7 +2,7 @@ const got = require("got");
 
 module.exports = { getStreams };
 
-const addon_name = "LookMovie.io";
+const ADDON_NAME = "LookMovie.io";
 
 const URL = "https://lookmovie.io";
 const URL_FP = "https://false-promise.lookmovie.io";
@@ -12,17 +12,21 @@ async function getStreams(show_imdb, show_name, show_isMovie, show_episode, show
     try {
 
         let streams = [];
-
         const slugs = await getSlugs(show_name, show_isMovie);
 
-        if (show_isMovie == true) {
-            // todo
-        } else if (show_isMovie == false) {
-            // todo
+        console.log("slugs length: " + slugs.length);
+        console.log("slugs: " + slugs);
+
+        if (show_isMovie == true) {          // movie
+            const movie_ids = await getMovieID(slugs);
+            console.log(movie_ids);
+        } else if (show_isMovie == false) {  // series
+            const show_ids = await getSeriesID(slugs, show_episode, show_season);
+            console.log(show_ids);
         } else {
-            return console.error("show_isMovie not true or false");
+            return console.error("getStreams(): show_isMovie not true or false");
         }
-        console.log("slugs amount: " + slugs.length);
+
 
 
         return streams;
@@ -31,7 +35,7 @@ async function getStreams(show_imdb, show_name, show_isMovie, show_episode, show
     }
 }
 
-// done (maybe. made at klo 7 in the morning)
+// done (maybe, made at klo 7 in the morning)
 async function getSlugs(show_name, show_isMovie) {
     try {
         console.log("show name: " + show_name);
@@ -69,29 +73,87 @@ async function getSlugs(show_name, show_isMovie) {
 
 
     } catch (err) {
+        console.error("Failed getSlugs() for show_name: " + show_name);
         console.error(err);
         return [];
     }
 }
 
 
-// not done
+// done
 async function getMovieID(slugs) {
 
-}
+    let movies = [];
 
-// not done
-async function getSeriesID(slugs) {
     for (const slug of slugs) {
         try {
-            console.log("trying slug: " + slug);
-            const show_id = await getShowID(show_slug)
-            console.log("show_id: " + show_id);
 
+            let movie = {};
+            movie["slug"] = slug;
+
+            console.log("trying movie slug: " + slug);
+
+            let URL_SLUG_MOVIES = `${URL}/movies/view/${slug}`;
+
+            const html = await got(URL_SLUG_MOVIES);
+            const html_body = html.body;
+
+            // same for movies and shows
+            movie["title"] = html.body.match(/title: '([^']+)'/)[1];
+            movie["year"] = html.body.match(/year: '(\d+)'/)[1];
+
+            // only for movies
+            movie["movie_id"] = html_body.match(/id_movie: (\d+)/)[1];
+
+            movies.push(movie);
 
         } catch (err) {
             console.error(err);
-            console.log("Didn't find show: " + slug);
+            console.warn("Didn't find movie: " + slug);
         }
     }
+    return movies;
+}
+
+// done
+async function getSeriesID(slugs, show_episode, show_season) {
+
+    let shows = [];
+
+    for (const slug of slugs) {
+        try {
+
+            let show = {};
+            show["slug"] = slug;
+
+            console.log("trying series slug: " + slug);
+
+            let URL_SLUG_SHOWS = `${URL}/shows/view/${slug}`;
+
+            const html = await got(URL_SLUG_SHOWS);
+            const html_body = html.body;
+
+
+            const EPISODE_DATA_REGEX = new RegExp(
+                `title: '([^']+)', episode: '${show_episode}', id_episode: (\\d+), season: '${show_season}'`
+            );
+
+
+            // same for movies and series
+            show["title"] = html.body.match(/title: '([^']+)'/)[1];
+            show["year"] = html.body.match(/year: '(\d+)'/)[1];
+
+            // only for series
+            show["episode_title"] = html.body.match(EPISODE_DATA_REGEX)[1];
+            show["episode_id"] = html_body.match(EPISODE_DATA_REGEX)[2];
+            show["show_id"] = html_body.match(/id_show: (\d+)/)[1];
+
+            shows.push(show);
+
+        } catch (err) {
+            console.error(err);
+            console.warn("Didn't find episode " + show_episode + " of season " + show_season + " of show " + slug);
+        }
+    }
+    return shows;
 }
