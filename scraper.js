@@ -174,9 +174,9 @@ async function convertSlugsToHTML(slugs) {
 }
 
 async function requestAsync(url) {
-    return new Promise(async (resolve, reject) => {
+    const response = await got(url);
+    return new Promise((resolve, reject) => {
         try {
-            const response = await got(url);
             resolve(response.body);
         } catch (error) {
             return reject(error);
