@@ -38,7 +38,7 @@ builder.defineStreamHandler(async function (args) {
         // get streams
         if (args.type == "movie") {          // for movies
             console.log("show is movie");
-            const returnedStreams = scraper.getStreams(show_imdb, show_name, true, null, null, show_year);
+            const returnedStreams = scraper.getStremioStreams(show_imdb, show_name, true, null, null, show_year);
             streams.push(returnedStreams);
 
         } else if (args.type == "series") {  // for series
@@ -48,7 +48,7 @@ builder.defineStreamHandler(async function (args) {
             const show_season = args.id.match(/tt.+:(.+):.+/)[1];
             const show_episode = args.id.match(/tt.+:.+:(.+)/)[1];
 
-            const returnedStreams = scraper.getStreams(show_imdb, show_name, false, show_episode, show_season, show_year);
+            const returnedStreams = scraper.getStremioStreams(show_imdb, show_name, false, show_episode, show_season, show_year);
             streams.push(returnedStreams);
         }
     } catch (err) {
@@ -62,7 +62,7 @@ serveHTTP(builder.getInterface(), { port: process.env.PORT || 7000 });
 //publishToCentral("https://your-domain/manifest.json") // <- invoke this if you want to publish your addon and it's accessible publically on "your-domain"
 
 
-// input tt0123456
+// input imdb: tt0123456
 async function getShowMetadata(show_imdb, show_type) {
     const cinemeta_url = `https://v3-cinemeta.strem.io/meta/${show_type}/${show_imdb}.json`;
     console.log("cinemeta url: " + cinemeta_url);

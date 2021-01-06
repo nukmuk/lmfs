@@ -1,14 +1,14 @@
 const got = require("got");
 
-module.exports = { getStreams };
+module.exports = { getStremioStreams: getStremioStreams };
 
 const ADDON_NAME = "LookMovie.io";
 
-const URL = "https://lookmovie.io";
-const URL_FP = "https://false-promise.lookmovie.io";
+const URL_BASE = "https://lookmovie.io";
+const URL_FP_BASE = "https://false-promise.lookmovie.io";
 
 // not done
-async function getStreams(show_imdb, show_title, show_isMovie, show_episode, show_season, show_year) {
+async function getStremioStreams(show_imdb, show_title, show_isMovie, show_episode, show_season, show_year) {
     try {
 
         // 2013-2021 => 2013
@@ -23,9 +23,13 @@ async function getStreams(show_imdb, show_title, show_isMovie, show_episode, sho
         if (show_isMovie == true) {          // movie
             const movie_ids = await getMovieIDAsync(slugs, show_title, show_year_short);
             console.log(movie_ids);
+            const movie_streams = await getStreams(movie_ids);
+            console.log(movie_streams);
         } else if (show_isMovie == false) {  // series
-            const show_ids = await getSeriesIDAsync(slugs, show_episode, show_season, show_title, show_year_short);
-            console.log(show_ids);
+            const series_ids = await getSeriesIDAsync(slugs, show_episode, show_season, show_title, show_year_short);
+            console.log(series_ids);
+            const series_streams = await getStreams(series_ids);
+            console.log(series_streams);
         } else {
             return console.error("getStreams(): show_isMovie not true or false");
         }
@@ -38,13 +42,16 @@ async function getStreams(show_imdb, show_title, show_isMovie, show_episode, sho
     }
 }
 
+
+
 // done
 async function getSlugs(show_title, show_isMovie) {
     try {
         console.log("show title: " + show_title);
         const show_encodedtitle = encodeURIComponent(show_title);
+        console.warn("isMovie: " + show_isMovie);
         const showType = getShowType(show_isMovie);
-        const searchURL = `${URL}/api/v1/${showType}/search/?q=${show_encodedtitle}`;
+        const searchURL = `${URL_BASE}/api/v1/${showType}/search/?q=${show_encodedtitle}`;
 
         console.log(searchURL);
         const search_results = await got(searchURL);
@@ -80,6 +87,7 @@ async function getMovieIDAsync(slugs, show_title, show_year) {
 
     let movies = [];
 
+
     const slugs_res_bodies = await getHTMLBodiesFromSlugs(slugs, true);
 
     console.log("length of slugs_responses: " + slugs_res_bodies.length);
@@ -95,6 +103,7 @@ async function getMovieIDAsync(slugs, show_title, show_year) {
             movie["year"] = body.match(/year: '(\d+)'/)[1];
 
             // only for movies
+            movie["isMovie"] = true;
             movie["movie_id"] = body.match(/id_movie: (\d+)/)[1];
 
 
@@ -120,6 +129,7 @@ async function getSeriesIDAsync(slugs, show_episode, show_season, show_title, sh
 
     let shows = [];
 
+
     const slugs_res_bodies = await getHTMLBodiesFromSlugs(slugs, false);
 
     console.log("length of slugs_responses: " + slugs_res_bodies.length);
@@ -135,6 +145,7 @@ async function getSeriesIDAsync(slugs, show_episode, show_season, show_title, sh
             show["year"] = body.match(/year: '(\d+)'/)[1];
 
             // only for series
+            show["isMovie"] = "false";
             const EPISODE_DATA_REGEX = new RegExp(
                 `title: '((?:\\\\'|[^'])+)', episode: '${show_episode}', id_episode: (\\d+), season: '${show_season}'`
             );
@@ -156,6 +167,60 @@ async function getSeriesIDAsync(slugs, show_episode, show_season, show_title, sh
         }
     }
     return shows;
+}
+
+// not done
+// input show object from getID functions
+async function getStreams(show) {
+    try {
+        console.log(JSON.stringify(show, null, 4));
+        console.warn("isMovie: " + show.isMovie);
+        const showType = getShowType(show.isMovie);
+
+        let showID, showID_type;
+
+        if (show.isMovie == true) {
+            console.log("ISMOVIE TRUE");
+            showID = show["movie_id"];
+            showID_type = "id_movie";
+        } else {
+            showID = show["slug"];
+            showID_type = "slug";
+        }
+
+        console.log(showID);
+
+        const dataURL = `${URL_FP_BASE}/api/v1/storage/${showType}?${showID_type}=${showID}`;
+        console.warn("dataurl: " + dataURL);
+
+        const res = await got(dataURL);
+        const body = JSON.parse(res.body);
+        const data = body["data"];
+        const expires = data["expires"];
+        const accessToken = data["accessToken"];
+
+        console.log(data);
+
+        const URL_STREAM_BASE = `${URL_BASE}/manifests/${showType}/json`;
+
+
+        let streamURL;
+
+        if (show["isMovie"]) {
+            streamURL = `${URL_STREAM_BASE}/${accessToken}/${expires}/${show.episode_id}/master.m3u8`
+        } else {
+            streamURL = `${URL_STREAM_BASE}/${show.movie_id}/${expires}/${accessToken}/master.m3u8`
+        }
+
+        console.warn("streamURL: " + streamURL);
+
+        const streams_res = await got(streamURL);
+        const streams_parsed = JSON.parse(streams_res.body);
+        console.warn(JSON.stringify(streams_parsed, null, 4));
+
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 async function requestAsync(url) {
@@ -187,13 +252,22 @@ function checkShowMatch(show, show_title, show_year) {
 }
 
 async function getHTMLBodiesFromSlugs(slugs, show_isMovie) {
+
+    console.warn("isMovie: " + show_isMovie);
+
     const showType = getShowType(show_isMovie);
-    const slugs_urls = slugs.map(slug => `${URL}/${showType}/view/${slug}`);
+    const slugs_urls = slugs.map(slug => `${URL_BASE}/${showType}/view/${slug}`);
     const slugs_res_bodies = await gotAsync(slugs_urls);
     return slugs_res_bodies;
 }
 
-function getShowType(show_isMovie) {
-    const showType = show_isMovie ? "movies" : "shows";
-    return showType;
+function getShowType(isMovie) {
+    console.log("getshowtype: " + isMovie);
+    if (isMovie == true) {
+        return "movies";
+    } else if (isMovie == undefined) {
+        return console.error("getShowType(): isMovie not true/false, was: " + isMovie);
+    } else {
+        return "shows";
+    }
 }
