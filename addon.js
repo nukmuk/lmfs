@@ -30,14 +30,15 @@ builder.defineStreamHandler(async function (args) {
 
         console.log("args.type: " + args.type);
 
-        // get name of the show from cinemeta
-        const show_name = await getShowName(show_imdb, args.type);
+        const show_meta = await getShowMetadata(show_imdb, args.type);
+        const show_name = show_meta["name"];
+        const show_year = show_meta["year"];
         console.log("SHOW NAME: " + show_name);
 
         // get streams
         if (args.type == "movie") {          // for movies
             console.log("show is movie");
-            const returnedStreams = scraper.getStreams(show_imdb, show_name, true);
+            const returnedStreams = scraper.getStreams(show_imdb, show_name, true, null, null, show_year);
             streams.push(returnedStreams);
 
         } else if (args.type == "series") {  // for series
@@ -47,7 +48,7 @@ builder.defineStreamHandler(async function (args) {
             const show_season = args.id.match(/tt.+:(.+):.+/)[1];
             const show_episode = args.id.match(/tt.+:.+:(.+)/)[1];
 
-            const returnedStreams = scraper.getStreams(show_imdb, show_name, false, show_episode, show_season);
+            const returnedStreams = scraper.getStreams(show_imdb, show_name, false, show_episode, show_season, show_year);
             streams.push(returnedStreams);
         }
     } catch (err) {
@@ -62,12 +63,12 @@ serveHTTP(builder.getInterface(), { port: process.env.PORT || 7000 });
 
 
 // input tt0123456
-async function getShowName(show_imdb, show_type) {
+async function getShowMetadata(show_imdb, show_type) {
     const cinemeta_url = `https://v3-cinemeta.strem.io/meta/${show_type}/${show_imdb}.json`;
     console.log("cinemeta url: " + cinemeta_url);
-    const cinemeta_html = await got(cinemeta_url);
-    const cinemeta_json = JSON.parse(cinemeta_html.body);
-    const show_name = cinemeta_json["meta"]["name"];
-    console.log("got show name from cinemeta: " + show_name);
-    return show_name;
+    const cinemeta_res = await got(cinemeta_url);
+    const cinemeta_json = JSON.parse(cinemeta_res.body);
+    const show_meta = cinemeta_json["meta"];
+    console.log("got show meta from cinemeta: " + show_meta);
+    return show_meta;
 }

@@ -8,20 +8,23 @@ const URL = "https://lookmovie.io";
 const URL_FP = "https://false-promise.lookmovie.io";
 
 // not done
-async function getStreams(show_imdb, show_name, show_isMovie, show_episode, show_season) {
+async function getStreams(show_imdb, show_title, show_isMovie, show_episode, show_season, show_year) {
     try {
 
+        // 2013-2021 => 2013
+        const show_year_short = show_year.match(/\d+/);
+
         let streams = [];
-        const slugs = await getSlugs(show_name, show_isMovie);
+        const slugs = await getSlugs(show_title, show_isMovie);
 
         console.log("slugs length: " + slugs.length);
         console.log("slugs: " + slugs);
 
         if (show_isMovie == true) {          // movie
-            const movie_ids = await getMovieID(slugs);
+            const movie_ids = await getMovieIDAsync(slugs, show_title, show_year_short);
             console.log(movie_ids);
         } else if (show_isMovie == false) {  // series
-            const show_ids = await getSeriesIDAsync(slugs, show_episode, show_season);
+            const show_ids = await getSeriesIDAsync(slugs, show_episode, show_season, show_title, show_year_short);
             console.log(show_ids);
         } else {
             return console.error("getStreams(): show_isMovie not true or false");
@@ -36,21 +39,12 @@ async function getStreams(show_imdb, show_name, show_isMovie, show_episode, show
 }
 
 // done
-async function getSlugs(show_name, show_isMovie) {
+async function getSlugs(show_title, show_isMovie) {
     try {
-        console.log("show name: " + show_name);
-        const show_encodedname = encodeURIComponent(show_name);
-
-        let searchURL;
-
-        if (show_isMovie == true) {
-            searchURL = `${URL}/api/v1/movies/search/?q=${show_encodedname}`;
-        } else if (show_isMovie == false) {
-            searchURL = `${URL}/api/v1/shows/search/?q=${show_encodedname}`;
-        } else {
-            console.error("show_isMovie not true or false");
-            return [];
-        }
+        console.log("show title: " + show_title);
+        const show_encodedtitle = encodeURIComponent(show_title);
+        const showType = getShowType(show_isMovie);
+        const searchURL = `${URL}/api/v1/${showType}/search/?q=${show_encodedtitle}`;
 
         console.log(searchURL);
         const search_results = await got(searchURL);
@@ -73,7 +67,7 @@ async function getSlugs(show_name, show_isMovie) {
 
 
     } catch (err) {
-        console.error("Failed getSlugs() for show_name: " + show_name);
+        console.error("Failed getSlugs() for show_title: " + show_title);
         console.error(err);
         return [];
     }
@@ -81,73 +75,80 @@ async function getSlugs(show_name, show_isMovie) {
 
 
 // done
-async function getMovieID(slugs) {
+// show_title and year are only used to check if shows from lookmovie search is actually same show user selected from stremio
+async function getMovieIDAsync(slugs, show_title, show_year) {
 
     let movies = [];
 
-    for (const slug of slugs) {
+    const slugs_res_bodies = await getHTMLBodiesFromSlugs(slugs, true);
+
+    console.log("length of slugs_responses: " + slugs_res_bodies.length);
+
+    for (const body of slugs_res_bodies) {
         try {
 
             let movie = {};
-            movie["slug"] = slug;
 
-            console.log("trying movie slug: " + slug);
-
-            let URL_SLUG_MOVIES = `${URL}/movies/view/${slug}`;
-
-            const html = await got(URL_SLUG_MOVIES);
-            const html_body = html.body;
-
-            // same for movies and shows
-            movie["title"] = html.body.match(/title: '([^']+)'/)[1];
-            movie["year"] = html.body.match(/year: '(\d+)'/)[1];
+            // same for all shows
+            movie["slug"] = body.match(/\/movies\/view\/([^"]+)/)[1];
+            movie["title"] = body.match(/title: '((?:\\'|[^'])+)'/)[1].replace("\\", "");
+            movie["year"] = body.match(/year: '(\d+)'/)[1];
 
             // only for movies
-            movie["movie_id"] = html_body.match(/id_movie: (\d+)/)[1];
+            movie["movie_id"] = body.match(/id_movie: (\d+)/)[1];
 
-            movies.push(movie);
+
+            movie["match"] = checkShowMatch(movie, show_title, show_year);
+            if (movie["match"]) {
+                // console.warn(movie["title"] + movie["year"] + ", matches: " + movie_title + movie_year);
+                return movie;
+            } else {
+                // console.warn(movie["title"] + movie["year"] + ", not match: " + movie_title + movie_year);
+                movies.push(movie);
+            }
 
         } catch (err) {
             console.error(err);
-            console.warn("Didn't find movie: " + slug);
+            console.warn("Didn't find movie");
         }
     }
     return movies;
 }
 
 // done
-async function getSeriesIDAsync(slugs, show_episode, show_season) {
+async function getSeriesIDAsync(slugs, show_episode, show_season, show_title, show_year) {
 
     let shows = [];
 
-    const slugsURLs = slugs.map(x => `${URL}/shows/view/${x}`);
+    const slugs_res_bodies = await getHTMLBodiesFromSlugs(slugs, false);
 
-    const slugs_html = await getParallel(slugsURLs);
+    console.log("length of slugs_responses: " + slugs_res_bodies.length);
 
-    console.log("length of slugs_html: " + slugs_html.length);
-
-    for (const html of slugs_html) {
+    for (const body of slugs_res_bodies) {
         try {
 
             let show = {};
 
-            console.log(html);
-            const EPISODE_DATA_REGEX = new RegExp(
-                `title: '([^']+)', episode: '${show_episode}', id_episode: (\\d+), season: '${show_season}'`
-            );
-
-
-            // same for movies and series
-            show["slug"] = html.match(/slug: '([^']+)'/)[1];
-            show["title"] = html.match(/title: '([^']+)'/)[1];
-            show["year"] = html.match(/year: '(\d+)'/)[1];
+            // same for all shows
+            show["slug"] = body.match(/slug: '([^']+)'/)[1];
+            show["title"] = body.match(/title: '((?:\\'|[^'])+)'/)[1].replace("\\", "");
+            show["year"] = body.match(/year: '(\d+)'/)[1];
 
             // only for series
-            show["episode_title"] = html.match(EPISODE_DATA_REGEX)[1];
-            show["episode_id"] = html.match(EPISODE_DATA_REGEX)[2];
-            show["show_id"] = html.match(/id_show: (\d+)/)[1];
+            const EPISODE_DATA_REGEX = new RegExp(
+                `title: '((?:\\\\'|[^'])+)', episode: '${show_episode}', id_episode: (\\d+), season: '${show_season}'`
+            );
+            show["episode_id"] = body.match(EPISODE_DATA_REGEX)[2];
+            show["episode_title"] = body.match(EPISODE_DATA_REGEX)[1].replace("\\", "");
+            show["series_id"] = body.match(/id_show: (\d+)/)[1];
 
-            shows.push(show);
+
+            show["match"] = checkShowMatch(show, show_title, show_year);
+            if (show["match"]) {
+                return show;
+            } else {
+                shows.push(show);
+            }
 
         } catch (err) {
             console.error(err);
@@ -155,22 +156,6 @@ async function getSeriesIDAsync(slugs, show_episode, show_season) {
         }
     }
     return shows;
-}
-
-// sends http requests in parallel. returns array of got html response object things
-async function convertSlugsToHTML(slugs) {
-
-    const slugsURLs = slugs.map(x => `${URL}/shows/view/${x}`);
-
-    console.warn(slugsURLs);
-
-    const promises = slugsURLs.map(got);
-    let result = [];
-    result = await Promise.allSettled(promises);
-    console.log("ASDAJDKSSAKLJDAHSKJDSJKDHASKJDHASD");
-    console.warn(result);
-    return result;
-
 }
 
 async function requestAsync(url) {
@@ -184,11 +169,31 @@ async function requestAsync(url) {
     });
 }
 
-async function getParallel(slugs) {
+async function gotAsync(URLs) {
+    let data;
     try {
-        var data = await Promise.all(slugs.map(requestAsync));
+        data = await Promise.all(URLs.map(requestAsync));
     } catch (err) {
-        console.error("ERROR: " + err);
+        console.error(err);
     }
     return data;
+}
+
+function checkShowMatch(show, show_title, show_year) {
+    const match = show["title"] == show_title && show["year"] == show_year;
+    console.warn(show["title"] + show["year"] + ", match check: " + show_title + show_year);
+    console.warn(match);
+    return match;
+}
+
+async function getHTMLBodiesFromSlugs(slugs, show_isMovie) {
+    const showType = getShowType(show_isMovie);
+    const slugs_urls = slugs.map(slug => `${URL}/${showType}/view/${slug}`);
+    const slugs_res_bodies = await gotAsync(slugs_urls);
+    return slugs_res_bodies;
+}
+
+function getShowType(show_isMovie) {
+    const showType = show_isMovie ? "movies" : "shows";
+    return showType;
 }
