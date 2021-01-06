@@ -25,11 +25,13 @@ async function getStremioStreams(show_imdb, show_title, show_isMovie, show_episo
             console.log(movie_ids);
             const movie_streams = await getStreams(movie_ids);
             console.log(movie_streams);
+            return movie_streams;
         } else if (show_isMovie == false) {  // series
             const series_ids = await getSeriesIDAsync(slugs, show_episode, show_season, show_title, show_year_short);
             console.log(series_ids);
             const series_streams = await getStreams(series_ids);
             console.log(series_streams);
+            return series_streams;
         } else {
             return console.error("getStreams(): show_isMovie not true or false");
         }
@@ -146,6 +148,8 @@ async function getSeriesIDAsync(slugs, show_episode, show_season, show_title, sh
 
             // only for series
             show["isMovie"] = "false";
+            show.episode = show_episode;
+            show.season = show_season;
             const EPISODE_DATA_REGEX = new RegExp(
                 `title: '((?:\\\\'|[^'])+)', episode: '${show_episode}', id_episode: (\\d+), season: '${show_season}'`
             );
@@ -203,20 +207,66 @@ async function getStreams(show) {
 
         const URL_STREAM_BASE = `${URL_BASE}/manifests/${showType}/json`;
 
-
+        // build streamURL
         let streamURL;
-
-        if (show["isMovie"]) {
-            streamURL = `${URL_STREAM_BASE}/${accessToken}/${expires}/${show.episode_id}/master.m3u8`
+        if (show["isMovie"] == true) {
+            streamURL = `${URL_STREAM_BASE}/${show.movie_id}/${expires}/${accessToken}/master.m3u8`;
         } else {
-            streamURL = `${URL_STREAM_BASE}/${show.movie_id}/${expires}/${accessToken}/master.m3u8`
+            streamURL = `${URL_STREAM_BASE}/${accessToken}/${expires}/${show.episode_id}/master.m3u8`;
         }
-
         console.warn("streamURL: " + streamURL);
 
+        // get qualities from streamURL
         const streams_res = await got(streamURL);
         const streams_parsed = JSON.parse(streams_res.body);
         console.warn(JSON.stringify(streams_parsed, null, 4));
+
+        // loop through qualities and return streams
+        const qualities = [720, 480, 360];
+        let streams = [];
+        for (const s in streams_parsed) {
+            console.log("s: " + s);
+            if (!streams_parsed[s].endsWith("index.m3u8")) {
+                console.log("skipping quality: " + s);
+                continue;
+            } else {
+                const q = s.match(/\d+/); // 720
+                const qp = q + "p";       // 720p
+
+                let stream = {};
+
+                const matchEmoji = show.match ? "✔️" : "❌";
+                stream.title = `${matchEmoji}${show.title} ${show.year}\n${show.episode_title}`;
+                stream.url = streams_parsed[s];
+
+                stream.name = `${ADDON_NAME} ${qp}`;
+
+                stream.behaviorHints = {};
+                stream.behaviorHints.bingeGroup = `lookmovie-${q}-${show.slug}`;
+                streams.push(stream);
+
+            }
+        }
+        /*
+                for (const q of qualities) {
+                    const qp = q + "p";
+                    console.warn("result: " + Object.keys(streams_parsed));
+        
+                    let stream = {};
+                    stream["name"] = `${ADDON_NAME} ${qp}`;
+                    stream["url"] = streams_parsed[qp];
+                    stream.title = show.slug;
+        
+        
+                    streams.push = stream;
+        
+                    console.log("stream: " + stream);
+                }
+        */
+
+        console.log("streams: " + streams);
+        return streams;
+
 
     } catch (err) {
         console.error(err);

@@ -38,8 +38,8 @@ builder.defineStreamHandler(async function (args) {
         // get streams
         if (args.type == "movie") {          // for movies
             console.log("show is movie");
-            const returnedStreams = scraper.getStremioStreams(show_imdb, show_name, true, null, null, show_year);
-            streams.push(returnedStreams);
+            const returnedStreams = await scraper.getStremioStreams(show_imdb, show_name, true, null, null, show_year);
+            streams = returnedStreams;
 
         } else if (args.type == "series") {  // for series
             console.log("show is series");
@@ -48,12 +48,15 @@ builder.defineStreamHandler(async function (args) {
             const show_season = args.id.match(/tt.+:(.+):.+/)[1];
             const show_episode = args.id.match(/tt.+:.+:(.+)/)[1];
 
-            const returnedStreams = scraper.getStremioStreams(show_imdb, show_name, false, show_episode, show_season, show_year);
-            streams.push(returnedStreams);
+            const returnedStreams = await scraper.getStremioStreams(show_imdb, show_name, false, show_episode, show_season, show_year);
+            console.warn("RETURNED: " + returnedStreams);
+            streams = returnedStreams;
+            console.log("ALMOST FINAL: " + streams);
         }
     } catch (err) {
         console.error(err);
     }
+    console.warn("STREAMS FINAL: " + JSON.stringify(streams, null, 4));
     return Promise.resolve({ streams: streams });
 });
 
