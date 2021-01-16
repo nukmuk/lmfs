@@ -4,7 +4,7 @@ const scraper = require("./scraper.js");
 
 const builder = new addonBuilder({
     id: "com.stremio.lookmovie.addon",
-    version: "0.0.1",
+    version: "0.0.2",
     name: "LookMovie for Stremio",
     description: "Watch movies and shows hosted on LookMovie.io",
     icon: "https://lookmovie.io/android-icon-192x192.png",
@@ -20,7 +20,7 @@ const builder = new addonBuilder({
 // takes function(args)
 builder.defineStreamHandler(async function (args) {
 
-    let streams = [];
+    let streams;
 
     try {
 
@@ -38,20 +38,18 @@ builder.defineStreamHandler(async function (args) {
         // get streams
         if (args.type == "movie") {          // for movies
             console.log("show is movie");
-            const returnedStreams = await scraper.getStremioStreams(show_imdb, show_name, true, null, null, show_year);
-            streams = returnedStreams;
+            streams = await scraper.getSources(show_imdb, show_name, true, null, null, show_year);
+            // console.log("returned streams: " + streams);
 
         } else if (args.type == "series") {  // for series
             console.log("show is series");
 
-            // get season and episode number from args.id
+            // get season and episode number from args.id using regex
             const show_season = args.id.match(/tt.+:(.+):.+/)[1];
             const show_episode = args.id.match(/tt.+:.+:(.+)/)[1];
 
-            const returnedStreams = await scraper.getStremioStreams(show_imdb, show_name, false, show_episode, show_season, show_year);
-            console.warn("RETURNED: " + returnedStreams);
-            streams = returnedStreams;
-            console.log("ALMOST FINAL: " + streams);
+            streams = await scraper.getSources(show_imdb, show_name, false, show_episode, show_season, show_year);
+            console.warn("RETURNED: " + streams);
         }
     } catch (err) {
         console.error(err);
