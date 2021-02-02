@@ -18,6 +18,9 @@
   "homepage": "https://github.com/NUKMUK/lookmovie-for-stremio#readme",
   "dependencies": {
     "got": "^11.8.1",
+    "http-proxy-middleware": "^1.0.6",
+    "morgan": "^1.10.0",
+    "public-ip": "^4.0.3",
     "stremio-addon-sdk": "^1.6.4"
   }
 }

@@ -28,33 +28,26 @@ builder.defineStreamHandler(async function (args) {
         // args.id format: tt0123456:season:episode
         const show_imdb = args.id.match(/tt\d+/);
 
-        console.log("args.type: " + args.type);
-
         const show_meta = await getShowMetadata(show_imdb, args.type);
         const show_name = show_meta["name"];
         const show_year = show_meta["year"];
-        console.log("SHOW NAME: " + show_name);
 
         // get streams
         if (args.type == "movie") {          // for movies
-            console.log("show is movie");
             streams = await scraper.getSources(show_imdb, show_name, true, null, null, show_year);
-            // console.log("returned streams: " + streams);
 
         } else if (args.type == "series") {  // for series
-            console.log("show is series");
-
             // get season and episode number from args.id using regex
             const show_season = args.id.match(/tt.+:(.+):.+/)[1];
             const show_episode = args.id.match(/tt.+:.+:(.+)/)[1];
 
             streams = await scraper.getSources(show_imdb, show_name, false, show_episode, show_season, show_year);
-            console.warn("RETURNED: " + streams);
         }
     } catch (err) {
         console.error(err);
+        throw ("Failed");
     }
-    console.warn("STREAMS FINAL: " + JSON.stringify(streams, null, 4));
+    console.warn("STREAMS FINAL:", streams);
     return Promise.resolve({ streams: streams });
 });
 
@@ -65,11 +58,13 @@ serveHTTP(builder.getInterface(), { port: process.env.PORT || 7000 });
 
 // input imdb: tt0123456
 async function getShowMetadata(show_imdb, show_type) {
-    const cinemeta_url = `https://v3-cinemeta.strem.io/meta/${show_type}/${show_imdb}.json`;
-    console.log("cinemeta url: " + cinemeta_url);
-    const cinemeta_res = await got(cinemeta_url);
-    const cinemeta_json = JSON.parse(cinemeta_res.body);
-    const show_meta = cinemeta_json["meta"];
-    console.log("got show meta from cinemeta: " + show_meta);
-    return show_meta;
+    try {
+        const cinemeta_url = `https://v3-cinemeta.strem.io/meta/${show_type}/${show_imdb}.json`;
+        const cinemeta_res = await got(cinemeta_url);
+        const cinemeta_json = JSON.parse(cinemeta_res.body);
+        const show_meta = cinemeta_json["meta"];
+        return show_meta;
+    } catch (err) {
+        throw ("Didn't get metadata from cinemeta");
+    }
 }
