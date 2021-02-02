@@ -1,4 +1,3 @@
-const { error } = require("console");
 const got = require("got");
 const URL = require("url");
 const proxy = require("./proxy.js");
@@ -14,14 +13,13 @@ const URL_FP_BASE = "https://false-promise.lookmovie.io";
 const REGEX_DIGITSEQ = new RegExp(/\d+/);
 const REGEX_SUBS_FILES = new RegExp(/"file":.*"(\/[^"]+)"/g);
 const REGEX_SUBS_LABELS = new RegExp(/"label": "([^"]+)"/g);
-const REGEX_SUBS_BOTH = new RegExp(/"file":.*"(\/[^"]+)"|"label": "([^"]+)"/g);
 
-const PREFIX_SUBS = "💬";
-const PREFIX_MATCH_TRUE = ""; // ✔️
-const PREFIX_MATCH_FALSE = "❌";
-const SUFFIX_WARNING = "⚠️";
+const PREFIX_SUBS = "💬"; // icon before number of subs in stream title
+const PREFIX_MATCH_TRUE = ""; // ✔️ shown when found show matches title and year
+const PREFIX_MATCH_FALSE = "❌"; // shown when found show doesn't match title or year
+const SUFFIX_WARNING = ""; // ⚠️ shown after stream name when match fails
 // eslint-disable-next-line no-irregular-whitespace
-const PREFIX_EPISODEINFO = ""; // " >" U+2001 instead of space
+const PREFIX_EPISODEINFO = ""; // " >" U+2001 instead of space 
 
 const USE_ALTERNATE_SUBS_LANG = true; // display subs from lookmovie separately from other sources
 
@@ -240,6 +238,7 @@ async function getStreams(show) {
         // loop through qualities and return streams
         let streams = [];
         let proxyCreated = false;
+        let fhdFound = false;
         for (const s in streams_parsed) {
             // skip auto and dummy stuff
             if (!streams_parsed[s].endsWith("index.m3u8")) {
@@ -251,22 +250,29 @@ async function getStreams(show) {
                     proxy.createProxy(streams_parsed[s]);
                     proxyCreated = true;
                 }
+                if (s.includes("1080")) {
+                    fhdFound = true;
+                }
             }
         }
 
 
         // try to get 1080p stream
-        try {
-            // regex replaces quality (e.g. 480, 720) with 1080
-            const fhd_url = streams[0].url.replace(/(.*\/)(\d{3})(p?\/.*)/, "$11080$3");
-            console.warn("fhd_url: " + fhd_url);
-            const fhd_res = await got(fhd_url);
-            const fhd_status = fhd_res.statusCode;
-            if (fhd_status == 200) {
-                addStreamToArray("1080", show, fhd_url, streams);
+        if (!fhdFound) {
+            try {
+                // regex replaces quality (e.g. 480, 720) with 1080
+                const fhd_url = streams[0].url.replace(/(.*\/)(\d{3})(p?\/.*)/, "$11080$3");
+                console.warn("fhd_url: " + fhd_url);
+                const fhd_res = await got(fhd_url);
+                const fhd_status = fhd_res.statusCode;
+                if (fhd_status == 200) {
+                    console.log(fhd_status);
+                    addStreamToArray("1080", show, fhd_url, streams);
+                    fhdFound = true;
+                }
+            } catch (err) {
+                console.log("No 1080p stream found for:", show.title);
             }
-        } catch (err) {
-            console.log("No 1080p stream found for:", show.title);
         }
 
         return streams;
@@ -432,13 +438,17 @@ async function getEpisodeSubs(episode_id) {
     try {
 
         const subslist_url = `${URL_BASE}/api/v1/shows/episode-subtitles/?id_episode=${episode_id}`;
+        console.log(subslist_url);
         const subslist_res = await got(subslist_url);
         const subslist_json = JSON.parse(subslist_res.body);
+
+        if (subslist_json.length === 0) {
+            throw ("No subs for: " + episode_id);
+        }
 
         let subtitles = [];
 
         for (const s of subslist_json) {
-            console.warn(s);
             const languageName = s.languageName;
             const shard = s.shard;
             const isoCode = s.isoCode;
@@ -453,9 +463,9 @@ async function getEpisodeSubs(episode_id) {
             sub.lang = lang;
             subtitles.push(sub);
         }
-        console.log(subtitles);
         return subtitles;
     } catch (err) {
-        console.warn("Failed getting subs for:", episode_id);
+        console.log("Failed getting subs:", episode_id, err);
+        return [];
     }
 }

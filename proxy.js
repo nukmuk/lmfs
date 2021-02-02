@@ -12,11 +12,12 @@ const app = express();
 const PORT = 25565;
 const HOST = "0.0.0.0";
 
+console.log("PORT:" + PORT);
 // logging
 app.use(morgan("tiny"));
 
 // info get endpoint
-app.get("/info", (req, res, next) => {
+app.get("/info", (req, res) => {
     res.send("Proxy server for lookmovie");
 });
 
