@@ -23,7 +23,7 @@ const PREFIX_EPISODEINFO = ""; // " >" U+2001 instead of space
 
 const USE_ALTERNATE_SUBS_LANG = true; // display subs from lookmovie separately from other sources
 
-const PORT = 25565;
+const PORT = process.env.PORT2 || 8000;
 let EXTERNAL_IP;
 
 (async () => {
@@ -239,6 +239,7 @@ async function getStreams(show) {
         let streams = [];
         let proxyCreated = false;
         let fhdFound = false;
+        let someOriginalStreamUrl;
         for (const s in streams_parsed) {
             // skip auto and dummy stuff
             if (!streams_parsed[s].endsWith("index.m3u8")) {
@@ -252,6 +253,8 @@ async function getStreams(show) {
                 }
                 if (s.includes("1080")) {
                     fhdFound = true;
+                } else {
+                    someOriginalStreamUrl = streams_parsed[s];
                 }
             }
         }
@@ -261,7 +264,7 @@ async function getStreams(show) {
         if (!fhdFound) {
             try {
                 // regex replaces quality (e.g. 480, 720) with 1080
-                const fhd_url = streams[0].url.replace(/(.*\/)(\d{3})(p?\/.*)/, "$11080$3");
+                const fhd_url = someOriginalStreamUrl.replace(/(.*\/)(\d{3})(p?\/.*)/, "$11080$3");
                 console.warn("fhd_url: " + fhd_url);
                 const fhd_res = await got(fhd_url);
                 const fhd_status = fhd_res.statusCode;

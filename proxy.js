@@ -5,14 +5,13 @@ const URL = require("url");
 
 module.exports = { createProxy };
 
+// config
+const PORT = process.env.PORT2 || 8000;
+const HOST = "0.0.0.0";
+
 // create express server
 const app = express();
 
-// config
-const PORT = 25565;
-const HOST = "0.0.0.0";
-
-console.log("PORT:" + PORT);
 // logging
 app.use(morgan("tiny"));
 

@@ -4,7 +4,7 @@
   "description": "",
   "main": "addon.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node addon.js"
   },
   "repository": {
     "type": "git",
@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/NUKMUK/lookmovie-for-stremio#readme",
   "dependencies": {
+    "dotenv": "^8.2.0",
     "got": "^11.8.1",
     "http-proxy-middleware": "^1.0.6",
     "morgan": "^1.10.0",

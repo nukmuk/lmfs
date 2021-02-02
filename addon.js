@@ -1,3 +1,4 @@
+require("dotenv").config();
 const { addonBuilder, serveHTTP, publishToCentral } = require("stremio-addon-sdk");
 const got = require("got");
 const scraper = require("./scraper.js");
